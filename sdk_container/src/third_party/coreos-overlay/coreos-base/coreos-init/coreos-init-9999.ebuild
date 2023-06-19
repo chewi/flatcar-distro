@@ -10,11 +10,11 @@ CROS_WORKON_REPO="https://github.com"
 if [[ "${PV}" == 9999 ]]; then
 	KEYWORDS="~amd64 ~arm ~arm64 ~x86"
 else
-	CROS_WORKON_COMMIT="e502aab19632fda2a43938d02ff1104043173702" # flatcar-master
+	CROS_WORKON_COMMIT="03f851aca316b549d1643c27471fbff1e6606ea1" # krnowak/ssh-config
 	KEYWORDS="amd64 arm arm64 x86"
 fi
 
-PYTHON_COMPAT=( python3_{6..11} )
+PYTHON_COMPAT=( python3_{9..11} )
 
 inherit cros-workon systemd python-any-r1
 
@@ -24,9 +24,7 @@ SRC_URI=""
 
 LICENSE="BSD"
 SLOT="0/${PVR}"
-IUSE="test symlink-usr"
-
-REQUIRED_USE="symlink-usr"
+IUSE="test"
 
 # Daemons we enable here must installed during build/install in addition to
 # during runtime so the systemd unit enable step works.
@@ -46,9 +44,6 @@ RDEPEND="${DEPEND}
 
 src_install() {
 	emake DESTDIR="${D}" install
-
-	# Enable some sockets that aren't enabled by their own ebuilds.
-	systemd_enable_service sockets.target sshd.socket
 
 	# Enable some services that aren't enabled elsewhere.
 	systemd_enable_service rpcbind.target rpcbind.service
