@@ -362,6 +362,9 @@ profiles
 #
 # scripts
 
+sec-policy/selinux-base-policy
+sec-policy/selinux-container
+
 sys-apps/acl
 sys-apps/attr
 sys-apps/config-site
@@ -454,6 +457,7 @@ sys-libs/libnvme
 sys-libs/libseccomp
 sys-libs/ncurses
 sys-libs/readline
+sys-libs/libselinux
 sys-libs/talloc
 sys-libs/tdb
 sys-libs/tevent
