@@ -4,6 +4,8 @@ Documentation=https://github.com/vmware/open-vm-tools
 ConditionVirtualization=vmware
 
 [Service]
+# Flatcar: Terrible.
+ExecStartPre=/bin/bash -c "ln -srf /usr/share/vmtoolsd/pam.d/vmtoolsd /etc/pam.d/vmtoolsd"
 ExecStart=/usr/bin/vmtoolsd
 TimeoutStopSec=5
 

@@ -88,6 +88,13 @@ src_prepare() {
 }
 
 src_configure() {
+	# Flatcar: not really upstreamable… We probably can do it with
+	# a user patch that replaces `uname -r` in configure.ac with
+	# some `portageq best-version sys-kernel/coreos-kernel`.
+	local kver
+	kver=$(best_version sys-kernel/coreos-kernel)
+	kver=${kver#'sys-kernel/coreos-kernel-'}
+	kver="${kver%-r+([0-9])}-flatcar"
 	local myeconfargs=(
 		--disable-glibc-check
 		--without-root-privileges
@@ -104,7 +111,20 @@ src_configure() {
 		$(use_enable vgauth)
 		$(use_with dnet)
 		$(use_with icu)
+		# TODO: Put rules.d file into per-package
+		# INSTALL_MASK? We used to disable installing udev
+		# files.
 		--with-udev-rules-dir="$(get_udevdir)/rules.d"
+		# Flatcar: TO UPSTREAM:
+		$(use_with fuse fuse 2)
+		# Flatcar: TO UPSTREAM:
+		--disable-containerinfo
+		# Flatcar: TO UPSTREAM:
+		--without-gtk2
+		# Flatcar: TO UPSTREAM:
+		--disable-vmwgfxctrl
+		# Flatcar: not really upstreamable…
+		--kernel-release="${kver}"
 	)
 	# Avoid a bug in configure.ac
 	use ssl || myeconfargs+=( --without-ssl )
@@ -119,6 +139,9 @@ src_install() {
 	if use pam; then
 		rm "${ED}"/etc/pam.d/vmtoolsd || die
 		pamd_mimic_system vmtoolsd auth account
+		# Flatcar: quick hack
+		dodir /usr/share/vmtoolsd/pam.d
+		mv "${ED}"/etc/pam.d/vmtoolsd "${ED}"/usr/share/vmtoolsd/pam.d/vmtoolsd
 	fi
 
 	newinitd "${FILESDIR}/open-vm-tools.initd" vmware-tools
@@ -131,8 +154,11 @@ src_install() {
 		systemd_dounit "${FILESDIR}"/vmtoolsd.service
 	fi
 
-	# Make fstype = vmhgfs-fuse work in fstab
-	dosym vmhgfs-fuse /usr/bin/mount.vmhgfs-fuse
+	# Flatcar: TO UPSTREAM:
+	if use fuse; then
+		# Make fstype = vmhgfs-fuse work in fstab
+		dosym vmhgfs-fuse /usr/bin/mount.vmhgfs-fuse
+	fi
 
 	if use X; then
 		fperms 4711 /usr/bin/vmware-user-suid-wrapper
