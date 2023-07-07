@@ -1,85 +1,38 @@
-# Copyright 2007-2023 Gentoo Authors
+# Copyright 1999-2018 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=8
+EAPI=6
 
-inherit autotools linux-info pam systemd udev
+inherit autotools flag-o-matic multilib toolchain-funcs
 
-DESCRIPTION="Tools for VMware guests"
+DESCRIPTION="Opensourced tools for VMware guests"
 HOMEPAGE="https://github.com/vmware/open-vm-tools"
 MY_P="${P}-21855600"
 SRC_URI="https://github.com/vmware/open-vm-tools/releases/download/stable-${PV}/${MY_P}.tar.gz"
 
 LICENSE="LGPL-2.1"
 SLOT="0"
-KEYWORDS="amd64 x86"
-IUSE="X +deploypkg +dnet doc +fuse gtkmm +icu multimon pam +resolutionkms +ssl +vgauth"
-REQUIRED_USE="
-	multimon? ( X )
-	vgauth? ( ssl )
-"
+KEYWORDS="amd64 ~x86"
+# Flatcar: add USE flag salt-minion
+IUSE="+deploypkg +dnet +pic salt-minion" # TODO: pam
 
-RDEPEND="
-	dev-libs/glib
+DEPEND="dev-libs/glib:2
 	net-libs/libtirpc
 	deploypkg? ( dev-libs/libmspack )
-	fuse? ( sys-fs/fuse:0 )
-	pam? ( sys-libs/pam )
-	!pam? ( virtual/libcrypt:= )
-	ssl? ( dev-libs/openssl:0= )
-	vgauth? (
-		dev-libs/libxml2
-		dev-libs/xmlsec:=
-	)
-	X? (
-		x11-libs/libXext
-		multimon? ( x11-libs/libXinerama )
-		x11-libs/libXi
-		x11-libs/libXrender
-		x11-libs/libXrandr
-		x11-libs/libXtst
-		x11-libs/libSM
-		x11-libs/libXcomposite
-		x11-libs/gdk-pixbuf-xlib
-		x11-libs/gtk+:3
-		gtkmm? (
-			dev-cpp/gtkmm:3.0
-			dev-libs/libsigc++:2
-		)
-	)
-	dnet? ( dev-libs/libdnet )
-	icu? ( dev-libs/icu:= )
-	resolutionkms? (
-		x11-libs/libdrm[video_cards_vmware]
-		virtual/libudev
-	)
-"
+	dnet? ( dev-libs/libdnet-oem )"
 
-DEPEND="${RDEPEND}
-	net-libs/rpcsvc-proto
-"
-
-BDEPEND="
-	dev-util/glib-utils
-	virtual/pkgconfig
-	doc? ( app-doc/doxygen )
-"
+# Runtime dependencies provided by CoreOS, not the OEM:
+#	dev-libs/glib:2
+#	sys-apps/ethtool
+#	pam? ( sys-libs/pam )
+RDEPEND="dnet? ( dev-libs/libdnet-oem )
+	deploypkg? ( dev-libs/libmspack )"
 
 S="${WORKDIR}/${MY_P}"
 
 PATCHES=(
-	"${FILESDIR}/10.1.0-Werror.patch"
-	"${FILESDIR}/11.3.5-icu.patch"
+	"${FILESDIR}/${PN}-0001-configure-Add-options-for-fuse-hgfs-and-udev.patch"
 )
-
-pkg_setup() {
-	local CONFIG_CHECK="~VMWARE_BALLOON ~VMWARE_PVSCSI ~VMXNET3"
-	use X && CONFIG_CHECK+=" ~DRM_VMWGFX"
-	kernel_is -lt 3 9 || CONFIG_CHECK+=" ~VMWARE_VMCI ~VMWARE_VMCI_VSOCKETS"
-	kernel_is -lt 3 || CONFIG_CHECK+=" ~FUSE_FS"
-	kernel_is -lt 5 5 || CONFIG_CHECK+=" ~X86_IOPL_IOPERM"
-	linux-info_pkg_setup
-}
 
 src_prepare() {
 	eapply -p2 "${PATCHES[@]}"
@@ -87,89 +40,70 @@ src_prepare() {
 	eautoreconf
 }
 
+# Override configure's use of pkg-config to ensure ${SYSROOT} is respected.
+override_vmw_check_lib() {
+	local lib="$1"
+	local var="$2"
+	local pkgconfig="$(tc-getPKG_CONFIG)"
+	export "CUSTOM_${var}_CPPFLAGS=$(${pkgconfig} --cflags ${lib})"
+	export "CUSTOM_${var}_LIBS=$(${pkgconfig} --libs ${lib})"
+}
+
 src_configure() {
-	# Flatcar: not really upstreamable… We probably can do it with
-	# a user patch that replaces `uname -r` in configure.ac with
-	# some `portageq best-version sys-kernel/coreos-kernel`.
-	local kver
-	kver=$(best_version sys-kernel/coreos-kernel)
-	kver=${kver#'sys-kernel/coreos-kernel-'}
-	kver="${kver%-r+([0-9])}-flatcar"
+	local oemlib="/oem/$(get_libdir)"
+	local oeminc="/oem/include"
+
+	# set rpath even if oem is in ld.so.conf
+	append-ldflags "-Wl,-rpath,${oemlib}"
+
+	# libdnet is installed to /oem
+	export CUSTOM_DNET_CPPFLAGS="-I=${oeminc}"
+	export CUSTOM_DNET_LIBS="-L=${oemlib}"
+	export CUSTOM_MSPACK_CPPFLAGS="-I=${oeminc}"
+	export CUSTOM_MSPACK_LIBS="-L=${oemlib}"
+
+	# for everything else configure is still wrong because it calls
+	# pkg-config directly instead of favoring the ${CHOST}-pkg-config
+	# wrapper or using the standard autoconf macro.
+	override_vmw_check_lib glib-2.0 GLIB2
+	override_vmw_check_lib gmodule-2.0 GMODULE
+	override_vmw_check_lib gobject-2.0 GOBJECT
+	override_vmw_check_lib gthread-2.0 GTHREAD
+
 	local myeconfargs=(
-		--disable-glibc-check
-		--without-root-privileges
-		$(use_enable multimon)
-		$(use_with X x)
-		$(use_with X gtk3)
-		$(use_with gtkmm gtkmm3)
-		$(use_enable doc docs)
-		--disable-tests
-		$(use_enable resolutionkms)
-		--disable-static
+		--prefix=/oem
 		$(use_enable deploypkg)
-		$(use_with pam)
-		$(use_enable vgauth)
-		$(use_with dnet)
-		$(use_with icu)
-		# TODO: Put rules.d file into per-package
-		# INSTALL_MASK? We used to disable installing udev
-		# files.
-		--with-udev-rules-dir="$(get_udevdir)/rules.d"
-		# Flatcar: TO UPSTREAM:
-		$(use_with fuse fuse 2)
-		# Flatcar: TO UPSTREAM:
+		$(use_enable salt-minion)
 		--disable-containerinfo
-		# Flatcar: TO UPSTREAM:
-		--without-gtk2
-		# Flatcar: TO UPSTREAM:
-		--disable-vmwgfxctrl
-		# Flatcar: not really upstreamable…
-		--kernel-release="${kver}"
+		--disable-docs
+		--disable-multimon
+		--disable-tests
+		--without-fuse
+		--without-icu
+		--without-kernel-modules
+		--without-pam
+		--without-udev-rules
+		--without-x
+		--disable-vgauth
+		$(use_with dnet)
+		--with-pic
 	)
-	# Avoid a bug in configure.ac
-	use ssl || myeconfargs+=( --without-ssl )
+	# TODO: $(use_with pam)
 
 	econf "${myeconfargs[@]}"
+
+	# Bugs 260878, 326761
+	find ./ -name Makefile | xargs sed -i -e 's/-Werror//g'  || die "sed out Werror failed"
 }
 
 src_install() {
-	default
-	find "${ED}" -name '*.la' -delete || die
+	# Relocate event scripts, a symlink will be created by the systemd
+	# unit.
+	emake DESTDIR="${D}" confdir=/oem/vmware-tools install
 
-	if use pam; then
-		rm "${ED}"/etc/pam.d/vmtoolsd || die
-		pamd_mimic_system vmtoolsd auth account
-		# Flatcar: quick hack
-		dodir /usr/share/vmtoolsd/pam.d
-		mv "${ED}"/etc/pam.d/vmtoolsd "${ED}"/usr/share/vmtoolsd/pam.d/vmtoolsd
-	fi
+	rm "${D}"/etc/pam.d/vmtoolsd
+	# TODO: pamd_mimic_system vmtoolsd auth account
 
-	newinitd "${FILESDIR}/open-vm-tools.initd" vmware-tools
-	newconfd "${FILESDIR}/open-vm-tools.confd" vmware-tools
-
-	if use vgauth; then
-		systemd_newunit "${FILESDIR}"/vmtoolsd.vgauth.service vmtoolsd.service
-		systemd_dounit "${FILESDIR}"/vgauthd.service
-	else
-		systemd_dounit "${FILESDIR}"/vmtoolsd.service
-	fi
-
-	# Flatcar: TO UPSTREAM:
-	if use fuse; then
-		# Make fstype = vmhgfs-fuse work in fstab
-		dosym vmhgfs-fuse /usr/bin/mount.vmhgfs-fuse
-	fi
-
-	if use X; then
-		fperms 4711 /usr/bin/vmware-user-suid-wrapper
-		dobin scripts/common/vmware-xdg-detect-de
-	fi
-}
-
-pkg_postinst() {
-	udev_reload
-}
-
-pkg_postrm() {
-	udev_reload
+	# We never bother with i10n on CoreOS
+	rm -rf "${D}"/usr/share/open-vm-tools
 }

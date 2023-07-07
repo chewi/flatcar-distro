@@ -9,8 +9,8 @@ inherit autotools
 
 DESCRIPTION="simplified, portable interface to several low-level networking routines"
 HOMEPAGE="https://github.com/ofalk/libdnet"
-SRC_URI="https://github.com/ofalk/${PN}/archive/${P}.tar.gz"
-S="${WORKDIR}/${PN}-${P}"
+SRC_URI="https://github.com/ofalk/libdnet/archive/libdnet-${PV}.tar.gz"
+S="${WORKDIR}/libdnet-libdnet-${PV}"
 
 LICENSE="LGPL-2"
 SLOT="0"
@@ -27,8 +27,8 @@ BDEPEND="
 DOCS=( README.md THANKS )
 
 PATCHES=(
-	"${FILESDIR}/${PN}-1.14-ndisc.patch"
-	"${FILESDIR}/${PN}-1.14-strlcpy.patch"
+	"${FILESDIR}/libdnet-1.14-ndisc.patch"
+	"${FILESDIR}/libdnet-1.14-strlcpy.patch"
 )
 
 src_prepare() {
