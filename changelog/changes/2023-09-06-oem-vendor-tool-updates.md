@@ -1,0 +1,1 @@
+- OEM vendor tools are now A/B updated if they are shipped as systemd-sysext images, the migration happens when both partitions require a systemd-sysext OEM image ([Flatcar#60](https://github.com/flatcar/Flatcar/issues/60))
