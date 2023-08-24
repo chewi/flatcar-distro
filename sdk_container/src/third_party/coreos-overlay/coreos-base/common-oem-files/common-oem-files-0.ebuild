@@ -4,8 +4,9 @@
 EAPI=8
 
 OEMIDS=(
-    qemu
     azure
+    ec2
+    qemu
 )
 
 DESCRIPTION='Common OEM files'
