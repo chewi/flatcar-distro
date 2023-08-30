@@ -1,0 +1,1 @@
+- AWS OEM images now uses systemd-sysext image for layering additional platform-specific software on top of `/usr`. The OEM software is still not updated but this will be added soon.
