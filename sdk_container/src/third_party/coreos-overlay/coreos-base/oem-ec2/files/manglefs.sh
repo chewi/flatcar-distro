@@ -22,4 +22,4 @@ WantedBy=multi-user.target
 EOF
 
 mkdir -p "${rootfs}/usr/lib/systemd/system/multi-user.target.d"
-{ echo "[Unit]"; echo "Upholds=amazon-ssm-agent.service coreos-metadata-sshkeys@.service setup-oem.service"; } > "${rootfs}/usr/lib/systemd/system/multi-user.target.d/10-oem-ec2.conf"
+{ echo "[Unit]"; echo "Upholds=amazon-ssm-agent.service coreos-metadata-sshkeys@core.service setup-oem.service"; } > "${rootfs}/usr/lib/systemd/system/multi-user.target.d/10-oem-ec2.conf"
