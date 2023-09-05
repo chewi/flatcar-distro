@@ -1,0 +1,55 @@
+From 5df9c13aff24be2116a9020388348e0a919f5ca8 Mon Sep 17 00:00:00 2001
+From: Mathieu Tortuyaux <mtortuyaux@microsoft.com>
+Date: Wed, 6 Sep 2023 17:56:51 +0200
+Subject: [PATCH 1/2] net/mlx5: Fix indexing of mlx5_irq
+
+commit 1da438c0ae02396dc5018b63237492cb5908608d upstream
+
+After the cited patch, mlx5_irq xarray index can be different then
+mlx5_irq MSIX table index.
+Fix it by storing both mlx5_irq xarray index and MSIX table index.
+
+Signed-off-by: Mathieu Tortuyaux <mtortuyaux@microsoft.com>
+---
+ drivers/net/ethernet/mellanox/mlx5/core/pci_irq.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/ethernet/mellanox/mlx5/core/pci_irq.c b/drivers/net/ethernet/mellanox/mlx5/core/pci_irq.c
+index df16dc35bb04..289945699f93 100644
+--- a/drivers/net/ethernet/mellanox/mlx5/core/pci_irq.c
++++ b/drivers/net/ethernet/mellanox/mlx5/core/pci_irq.c
+@@ -35,6 +35,7 @@ struct mlx5_irq {
+ 	int refcount;
+ 	u32 index;
+ 	int irqn;
++	u32 pool_index;
+ };
+ 
+ struct mlx5_irq_pool {
+@@ -142,7 +143,7 @@ static void irq_release(struct mlx5_irq *irq)
+ {
+ 	struct mlx5_irq_pool *pool = irq->pool;
+ 
+-	xa_erase(&pool->irqs, irq->index);
++	xa_erase(&pool->irqs, irq->pool_index);
+ 	/* free_irq requires that affinity and rmap will be cleared
+ 	 * before calling it. This is why there is asymmetry with set_rmap
+ 	 * which should be called after alloc_irq but before request_irq.
+@@ -236,11 +237,11 @@ static struct mlx5_irq *irq_request(struct mlx5_irq_pool *pool, int i)
+ 	}
+ 	irq->pool = pool;
+ 	irq->refcount = 1;
+-	irq->index = i;
+-	err = xa_err(xa_store(&pool->irqs, irq->index, irq, GFP_KERNEL));
++	irq->pool_index = i;
++	err = xa_err(xa_store(&pool->irqs, irq->pool_index, irq, GFP_KERNEL));
+ 	if (err) {
+ 		mlx5_core_err(dev, "Failed to alloc xa entry for irq(%u). err = %d\n",
+-			      irq->index, err);
++			      irq->pool_index, err);
+ 		goto err_xa;
+ 	}
+ 	return irq;
+-- 
+2.41.0
+
