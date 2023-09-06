@@ -70,7 +70,6 @@
 
 # Keep versions on both arches in sync.
 =sys-devel/automake-1.16.5-r1 ~arm64
-=sys-firmware/edk2-aarch64-18.02 **
 
 # Keep versions on both arches in sync.
 =sys-libs/libselinux-3.1-r3 ~arm64
