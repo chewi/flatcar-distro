@@ -86,6 +86,7 @@
 
 # ?
 =sys-power/acpid-2.0.33 ~amd64 ~arm64
+=sys-boot/mokutil-0.6.0 ~amd64
 
 # Accept unstable host Rust compilers.
 =virtual/rust-1.72.0 ~amd64 ~arm64
