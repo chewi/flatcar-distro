@@ -1,0 +1,60 @@
+#!/bin/bash
+set -e
+export PREFIX="/usr/local/microsoft"
+
+scripts_dir="/home/sdk/trunk/src/scripts"
+
+echo_green() {
+    >&2 echo -e -n "\\e[1m\\e[32m"
+    >&2 echo -e -n "$@"
+    >&2 echo -e "\\e[0m"
+}
+
+install_required_packages() {
+    echo_green "installing required packages"
+    sudo emerge sys-apps/bubblewrap
+    sudo emerge -1 ">=dev-python/gpep517-15"
+    echo_green "installing required packages - done"
+}
+
+copy_configuration() {
+    local dest_file="/usr/x86_64-cros-linux-gnu/etc/portage/repos.conf"
+
+    if [ ! -f "${dest_file}" ]; then
+        sudo cp -r "$(pwd)/prefix/staging${PREFIX}/etc/portage/repos.conf" "/usr/x86_64-cros-linux-gnu/etc/portage/"
+        echo_green "copying portage repos.conf - done"
+    fi
+}
+
+clone_cross_boss() {
+    if [ ! -d "$(pwd)/cross-boss" ]; then
+        echo_green "clonig cross-boss"
+        git clone https://github.com/chewi/cross-boss
+        echo_green "clonig cross-boss - done"
+    fi
+
+    echo "$(pwd)/cross-boss"
+    return
+}
+
+build_staging_env() {
+    if [ ! -d "${scripts_dir}/staging" ]; then
+        echo_green "building staging env"
+
+        local cross_boss_dir
+        cross_boss_dir="$(clone_cross_boss)"
+        install_required_packages
+
+        sudo env EPREFIX="${PREFIX}" "${cross_boss_dir}/bin/cb-bootstrap" "${scripts_dir}/prefix/staging"
+
+        echo_green "building staging env - done"
+    fi
+}
+
+
+copy_configuration
+build_staging_env
+
+cross_boss_dir="$(clone_cross_boss)"
+
+sudo env EPREFIX="${PREFIX}" "${cross_boss_dir}/bin/cb-emerge" "${scripts_dir}/prefix/staging" "$@"
